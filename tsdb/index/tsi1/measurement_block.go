@@ -210,7 +210,7 @@ func (itr *rawSeriesIDIterator) Next() (tsdb.SeriesIDElem, error) {
 
 	seriesID := itr.prev + uint64(delta)
 	itr.prev = seriesID
-	return tsdb.SeriesIDElem{SeriesID: seriesID}, nil
+	return tsdb.SeriesIDElem{SeriesID: tsdb.NewSeriesID(seriesID)}, nil
 }
 
 func (itr *rawSeriesIDIterator) SeriesIDSet() *tsdb.SeriesIDSet {
@@ -224,7 +224,7 @@ func (itr *rawSeriesIDIterator) SeriesIDSet() *tsdb.SeriesIDSet {
 
 		seriesID := prev + uint64(delta)
 		prev = seriesID
-		ss.AddNoLock(seriesID)
+		ss.AddNoLock(tsdb.NewSeriesID(seriesID))
 	}
 	return ss
 }
@@ -378,16 +378,16 @@ func (e *MeasurementBlockElem) HasSeries() bool { return e.series.n > 0 }
 //
 // NOTE: This should be used for testing and diagnostics purposes only.
 // It requires loading the entire list of series in-memory.
-func (e *MeasurementBlockElem) SeriesIDs() []uint64 {
-	a := make([]uint64, 0, e.series.n)
-	e.ForEachSeriesID(func(id uint64) error {
+func (e *MeasurementBlockElem) SeriesIDs() []tsdb.SeriesID {
+	a := make([]tsdb.SeriesID, 0, e.series.n)
+	e.ForEachSeriesID(func(id tsdb.SeriesID) error {
 		a = append(a, id)
 		return nil
 	})
 	return a
 }
 
-func (e *MeasurementBlockElem) ForEachSeriesID(fn func(uint64) error) error {
+func (e *MeasurementBlockElem) ForEachSeriesID(fn func(tsdb.SeriesID) error) error {
 	var prev uint64
 	for data := e.series.data; len(data) > 0; {
 		delta, n, err := uvarint(data)
@@ -397,7 +397,7 @@ func (e *MeasurementBlockElem) ForEachSeriesID(fn func(uint64) error) error {
 		data = data[n:]
 
 		seriesID := prev + uint64(delta)
-		if err = fn(seriesID); err != nil {
+		if err = fn(tsdb.NewSeriesID(seriesID)); err != nil {
 			return err
 		}
 		prev = seriesID
@@ -464,7 +464,7 @@ func NewMeasurementBlockWriter() *MeasurementBlockWriter {
 }
 
 // Add adds a measurement with series and tag set offset/size.
-func (mw *MeasurementBlockWriter) Add(name []byte, deleted bool, offset, size int64, seriesIDs []uint64) {
+func (mw *MeasurementBlockWriter) Add(name []byte, deleted bool, offset, size int64, seriesIDs []tsdb.SeriesID) {
 	mm := mw.mms[string(name)]
 	mm.deleted = deleted
 	mm.tagBlock.offset = offset
@@ -594,7 +594,7 @@ func (mw *MeasurementBlockWriter) writeMeasurementTo(w io.Writer, name []byte, m
 	mw.buf.Reset()
 	var prev uint64
 	for _, seriesID := range mm.seriesIDs {
-		delta := seriesID - prev
+		delta := seriesID.RawID() - prev
 
 		var buf [binary.MaxVarintLen32]byte
 		i := binary.PutUvarint(buf[:], uint64(delta))
@@ -602,7 +602,7 @@ func (mw *MeasurementBlockWriter) writeMeasurementTo(w io.Writer, name []byte, m
 			return err
 		}
 
-		prev = seriesID
+		prev = seriesID.RawID()
 	}
 
 	// Write series count.
@@ -639,7 +639,7 @@ type measurement struct {
 		offset int64
 		size   int64
 	}
-	seriesIDs []uint64
+	seriesIDs []tsdb.SeriesID
 	offset    int64
 }
 

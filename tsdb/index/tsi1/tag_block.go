@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/influxdata/influxdb/pkg/rhh"
+	"github.com/influxdata/influxdb/tsdb"
 )
 
 // TagBlockVersion is the version of the tag block.
@@ -560,7 +561,7 @@ func (enc *TagBlockEncoder) EncodeKey(key []byte, deleted bool) error {
 
 // EncodeValue writes a tag value to the underlying writer.
 // The tag key must be lexicographical sorted after the previous encoded tag key.
-func (enc *TagBlockEncoder) EncodeValue(value []byte, deleted bool, seriesIDs []uint64) error {
+func (enc *TagBlockEncoder) EncodeValue(value []byte, deleted bool, seriesIDs []tsdb.SeriesID) error {
 	if len(enc.keys) == 0 {
 		return fmt.Errorf("tag key must be encoded before encoding values")
 	} else if len(value) == 0 {
@@ -593,7 +594,7 @@ func (enc *TagBlockEncoder) EncodeValue(value []byte, deleted bool, seriesIDs []
 	enc.buf.Reset()
 	var prev uint64
 	for _, seriesID := range seriesIDs {
-		delta := seriesID - prev
+		delta := seriesID.RawID() - prev
 
 		var buf [binary.MaxVarintLen32]byte
 		i := binary.PutUvarint(buf[:], uint64(delta))
@@ -601,7 +602,7 @@ func (enc *TagBlockEncoder) EncodeValue(value []byte, deleted bool, seriesIDs []
 			return err
 		}
 
-		prev = seriesID
+		prev = seriesID.RawID()
 	}
 
 	// Write series count.

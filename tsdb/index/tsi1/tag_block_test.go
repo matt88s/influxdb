@@ -17,19 +17,19 @@ func TestTagBlockWriter(t *testing.T) {
 
 	if err := enc.EncodeKey([]byte("host"), false); err != nil {
 		t.Fatal(err)
-	} else if err := enc.EncodeValue([]byte("server0"), false, []uint64{1}); err != nil {
+	} else if err := enc.EncodeValue([]byte("server0"), false, toSeriesIDs([]uint64{1})); err != nil {
 		t.Fatal(err)
-	} else if err := enc.EncodeValue([]byte("server1"), false, []uint64{2}); err != nil {
+	} else if err := enc.EncodeValue([]byte("server1"), false, toSeriesIDs([]uint64{2})); err != nil {
 		t.Fatal(err)
-	} else if err := enc.EncodeValue([]byte("server2"), false, []uint64{3}); err != nil {
+	} else if err := enc.EncodeValue([]byte("server2"), false, toSeriesIDs([]uint64{3})); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := enc.EncodeKey([]byte("region"), false); err != nil {
 		t.Fatal(err)
-	} else if err := enc.EncodeValue([]byte("us-east"), false, []uint64{1, 2}); err != nil {
+	} else if err := enc.EncodeValue([]byte("us-east"), false, toSeriesIDs([]uint64{1, 2})); err != nil {
 		t.Fatal(err)
-	} else if err := enc.EncodeValue([]byte("us-west"), false, []uint64{3}); err != nil {
+	} else if err := enc.EncodeValue([]byte("us-west"), false, toSeriesIDs([]uint64{3})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ func benchmarkTagBlock_SeriesN(b *testing.B, tagN, valueN int, blk **tsi1.TagBlo
 			}
 
 			for j := 0; j < valueN; j++ {
-				if err := enc.EncodeValue([]byte(fmt.Sprintf("%08d", j)), false, []uint64{1}); err != nil {
+				if err := enc.EncodeValue([]byte(fmt.Sprintf("%08d", j)), false, toSeriesIDs([]uint64{1})); err != nil {
 					b.Fatal(err)
 				}
 			}
