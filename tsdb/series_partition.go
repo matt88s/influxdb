@@ -15,6 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var LOUD bool
+
 var (
 	ErrSeriesPartitionClosed              = errors.New("tsdb: series partition closed")
 	ErrSeriesPartitionCompactionCancelled = errors.New("tsdb: series partition compaction cancelled")
@@ -342,6 +344,10 @@ func (p *SeriesPartition) DeleteSeriesID(id SeriesID) error {
 	// Mark tombstone in memory.
 	p.index.Delete(id)
 
+	if LOUD {
+		fmt.Printf("removing [%d]\n", id.RawID())
+	}
+
 	return nil
 }
 
@@ -443,6 +449,11 @@ func (p *SeriesPartition) activeSegment() *SeriesSegment {
 
 func (p *SeriesPartition) insert(key []byte, typ models.FieldType) (id SeriesIDTyped, offset int64, err error) {
 	id = NewSeriesID(p.seq).WithType(typ)
+
+	if LOUD {
+		fmt.Printf("setting %q [%d] to %d\n", key, id.SeriesID().RawID(), typ)
+	}
+
 	offset, err = p.writeLogEntry(AppendSeriesEntry(nil, SeriesEntryInsertFlag, id, key))
 	if err != nil {
 		return SeriesIDTyped{}, 0, err

@@ -491,6 +491,9 @@ func TestShard_WritePoints_FieldConflictConcurrent(t *testing.T) {
 }
 
 func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
+	tsdb.LOUD = true
+	defer func() { tsdb.LOUD = false }()
+
 	if testing.Short() {
 		t.Skip()
 	}
@@ -516,7 +519,7 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 	// Spin up two goroutines that write points with different field types in reverse
 	// order concurrently.  After writing them, query them back.
 	errC := make(chan error, 2)
-	go func() {
+	go func(j int) {
 		// Write 250 floats and then ints to the same field
 		points := make([]models.Point, 0, 500)
 		for i := 0; i < cap(points); i++ {
@@ -538,12 +541,17 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 		}
 
 		for i := 0; i < 500; i++ {
+			fmt.Println(j, i, "deleting measurement")
 			if err := sh.DeleteMeasurement([]byte("cpu")); err != nil {
 				errC <- err
 			}
+			fmt.Println(j, i, "done deleting measurement")
 
+			fmt.Println(j, i, "writing points")
 			sh.WritePoints(points)
+			fmt.Println(j, i, "done writing points")
 			m := &influxql.Measurement{Name: "cpu"}
+			fmt.Println(j, i, "creating iterator")
 			iter, err := sh.CreateIterator(context.Background(), m, query.IteratorOptions{
 				Expr:       influxql.MustParseExpr(`value`),
 				Aux:        []influxql.VarRef{{Val: "value"}},
@@ -552,6 +560,8 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 				StartTime:  influxql.MinTime,
 				EndTime:    influxql.MaxTime,
 			})
+			_, isint := iter.(query.IntegerIterator)
+			fmt.Println(j, i, "done creating iterator:", isint)
 			if err != nil {
 				errC <- err
 			}
@@ -575,9 +585,9 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 
 		}
 		errC <- nil
-	}()
+	}(1)
 
-	go func() {
+	go func(j int) {
 		// Write 250 ints and then floats to the same field
 		points := make([]models.Point, 0, 500)
 		for i := 0; i < cap(points); i++ {
@@ -598,12 +608,17 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 			}
 		}
 		for i := 0; i < 500; i++ {
+			fmt.Println(j, i, "deleting measurement")
 			if err := sh.DeleteMeasurement([]byte("cpu")); err != nil {
 				errC <- err
 			}
+			fmt.Println(j, i, "done deleting measurement")
 
+			fmt.Println(j, i, "writing points")
 			sh.WritePoints(points)
+			fmt.Println(j, i, "done writing points")
 			m := &influxql.Measurement{Name: "cpu"}
+			fmt.Println(j, i, "creating iterator")
 			iter, err := sh.CreateIterator(context.Background(), m, query.IteratorOptions{
 				Expr:       influxql.MustParseExpr(`value`),
 				Aux:        []influxql.VarRef{{Val: "value"}},
@@ -612,6 +627,8 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 				StartTime:  influxql.MinTime,
 				EndTime:    influxql.MaxTime,
 			})
+			_, isint := iter.(query.IntegerIterator)
+			fmt.Println(j, i, "done creating iterator:", isint)
 			if err != nil {
 				errC <- err
 			}
@@ -632,7 +649,7 @@ func TestShard_WritePoints_FieldConflictConcurrentQuery(t *testing.T) {
 			}
 		}
 		errC <- nil
-	}()
+	}(2)
 
 	// Check results
 	for i := 0; i < cap(errC); i++ {
